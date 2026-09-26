@@ -106,7 +106,7 @@
 
   <div class="controls-bar">
     <div class="control-group">
-      <span class="control-label">Ambiente de fondo</span>
+      <span class="control-label">Paisaje sonoro</span>
       <div style="display:flex; gap:6px;" id="bgChips"></div>
     </div>
     <div class="control-group">
@@ -162,6 +162,9 @@ const BG_OPTIONS = [
   { id: "lluvia", label: "🌧️ Lluvia" },
   { id: "mar", label: "🌊 Mar" },
   { id: "viento", label: "🍃 Viento" },
+  { id: "fuego", label: "🔥 Fuego" },
+  { id: "rosa", label: "🌸 Ruido rosa" },
+  { id: "marron", label: "🟤 Ruido marrón" },
 ];
 
 const grid = document.getElementById("grid");
@@ -177,9 +180,36 @@ function fmt(secs) {
   return `${m}:${s}`;
 }
 
+let mediaDestNode = null;
+let mediaAudioEl = null;
+
+function getDestination(ctx) {
+  // Enruta la salida a través de un elemento <audio> real en vez de
+  // ctx.destination directo: iOS trata esto como "reproducción de medios"
+  // y permite que siga sonando con la pantalla bloqueada o al cambiar
+  // de app, algo que el Web Audio API puro no permite por sí solo.
+  if (!mediaDestNode) {
+    mediaDestNode = ctx.createMediaStreamDestination();
+    mediaAudioEl = document.createElement("audio");
+    mediaAudioEl.setAttribute("playsinline", "");
+    mediaAudioEl.autoplay = true;
+    mediaAudioEl.style.display = "none";
+    document.body.appendChild(mediaAudioEl);
+    mediaAudioEl.srcObject = mediaDestNode.stream;
+  }
+  mediaAudioEl.play().catch(() => {});
+  return mediaDestNode;
+}
+
 function ensureCtx() {
   if (!audioCtx || audioCtx.state === "closed") {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  // En iOS el AudioContext a veces queda "suspended" hasta que se reactiva
+  // explícitamente dentro de un toque del usuario — si no se hace esto,
+  // el audio simplemente nunca suena, sin ningún error visible.
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
   }
   return audioCtx;
 }
@@ -223,7 +253,92 @@ function createNoiseBuffer(ctx, seconds = 4) {
   return buffer;
 }
 
+function createPinkNoiseBuffer(ctx, seconds = 4) {
+  const length = Math.floor(ctx.sampleRate * seconds);
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+  for (let i = 0; i < length; i++) {
+    const white = Math.random() * 2 - 1;
+    b0 = 0.99886 * b0 + white * 0.0555179;
+    b1 = 0.99332 * b1 + white * 0.0750759;
+    b2 = 0.96900 * b2 + white * 0.1538520;
+    b3 = 0.86650 * b3 + white * 0.3104856;
+    b4 = 0.55000 * b4 + white * 0.5329522;
+    b5 = -0.7616 * b5 - white * 0.0168980;
+    data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+    b6 = white * 0.115926;
+  }
+  const fadeLen = Math.floor(ctx.sampleRate * 0.15);
+  for (let i = 0; i < fadeLen; i++) {
+    const f = i / fadeLen;
+    data[i] *= f;
+    data[length - 1 - i] *= f;
+  }
+  return buffer;
+}
+
+function createBrownNoiseBuffer(ctx, seconds = 4) {
+  const length = Math.floor(ctx.sampleRate * seconds);
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < length; i++) {
+    const white = Math.random() * 2 - 1;
+    last = (last + 0.02 * white) / 1.02;
+    data[i] = last * 3.5;
+  }
+  const fadeLen = Math.floor(ctx.sampleRate * 0.15);
+  for (let i = 0; i < fadeLen; i++) {
+    const f = i / fadeLen;
+    data[i] *= f;
+    data[length - 1 - i] *= f;
+  }
+  return buffer;
+}
+
+function makeShortNoiseBuffer(ctx, seconds) {
+  // Sin fundido de bordes: es un disparo único (no un bucle), y el
+  // propio envolvente de ganancia en spawnCrackle ya moldea el ataque
+  // y la caída. Un fundido largo aquí "cancelaba" el sonido entero.
+  const length = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+  return buffer;
+}
+
+function scheduleFireCrackles(ctx, bgGain) {
+  const holder = { timeoutId: null };
+  function spawnCrackle() {
+    const now = ctx.currentTime;
+    const dur = 0.02 + Math.random() * 0.05;
+    const buf = makeShortNoiseBuffer(ctx, dur + 0.02);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "bandpass";
+    filt.frequency.value = 1500 + Math.random() * 2500;
+    filt.Q.value = 1.5;
+    const g = ctx.createGain();
+    const peak = 0.25 + Math.random() * 0.35;
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(peak, now + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    src.connect(filt).connect(g).connect(bgGain);
+    src.start(now); src.stop(now + dur + 0.05);
+  }
+  function loop() {
+    spawnCrackle();
+    if (Math.random() < 0.15) setTimeout(spawnCrackle, 60 + Math.random() * 120);
+    holder.timeoutId = setTimeout(loop, 150 + Math.random() * 900);
+  }
+  holder.timeoutId = setTimeout(loop, 200);
+  return holder;
+}
+
 function stopBackground() {
+  if (bgNodes.crackleHolder) clearTimeout(bgNodes.crackleHolder.timeoutId);
   if (bgNodes.bgGain && audioCtx && audioCtx.state !== "closed") {
     const now = audioCtx.currentTime;
     try {
@@ -281,7 +396,7 @@ function startBackground(type) {
     dropEnvA.start(); dropEnvB.start();
     sources.push(dropEnvA, dropEnvB);
     filter.connect(texture); texture.connect(bgGain);
-    bgGain.connect(ctx.destination);
+    bgGain.connect(getDestination(ctx));
     bgNodes = { sources, bgGain, filter, extraOsc: [] };
     bgType = type;
     renderBgChips();
@@ -365,14 +480,67 @@ function startBackground(type) {
     sources.push(modEnvSlow, modEnvFast);
 
     leavesFilter.connect(leavesLevel).connect(bgGain);
-    bgGain.connect(ctx.destination);
+    bgGain.connect(getDestination(ctx));
     bgNodes = { sources, bgGain, filter, lfo, extraOsc: [] };
+    bgType = type;
+    renderBgChips();
+    return;
+  } else if (type === "fuego") {
+    // Rumor grave continuo + chispas aleatorias (temporizadas, no en bucle)
+    filter.type = "bandpass"; filter.frequency.value = 220; filter.Q.value = 0.7;
+    const layerA = ctx.createBufferSource();
+    layerA.buffer = createNoiseBuffer(ctx, 13); layerA.loop = true;
+    const layerB = ctx.createBufferSource();
+    layerB.buffer = createNoiseBuffer(ctx, 19); layerB.loop = true;
+    const gainA = ctx.createGain(); gainA.gain.value = 0.6;
+    const gainB = ctx.createGain(); gainB.gain.value = 0.4;
+    layerA.connect(gainA).connect(filter);
+    layerB.connect(gainB).connect(filter);
+    layerA.start(); layerB.start();
+    sources.push(layerA, layerB);
+
+    const rumbleLevel = ctx.createGain(); rumbleLevel.gain.value = 1.4;
+    const rumbleEnvSlow = ctx.createBufferSource();
+    rumbleEnvSlow.buffer = createEnvelopeBuffer(ctx, 27, 1.4); rumbleEnvSlow.loop = true;
+    const rumbleEnvFast = ctx.createBufferSource();
+    rumbleEnvFast.buffer = createEnvelopeBuffer(ctx, 11, 0.4); rumbleEnvFast.loop = true;
+    const rumbleDepthSlow = ctx.createGain(); rumbleDepthSlow.gain.value = 0.22;
+    const rumbleDepthFast = ctx.createGain(); rumbleDepthFast.gain.value = 0.15;
+    rumbleEnvSlow.connect(rumbleDepthSlow).connect(rumbleLevel.gain);
+    rumbleEnvFast.connect(rumbleDepthFast).connect(rumbleLevel.gain);
+    rumbleEnvSlow.start(); rumbleEnvFast.start();
+    sources.push(rumbleEnvSlow, rumbleEnvFast);
+
+    filter.connect(rumbleLevel).connect(bgGain);
+    bgGain.connect(getDestination(ctx));
+    const crackleHolder = scheduleFireCrackles(ctx, bgGain);
+    bgNodes = { sources, bgGain, filter, extraOsc: [], crackleHolder };
+    bgType = type;
+    renderBgChips();
+    return;
+  } else if (type === "rosa" || type === "marron") {
+    // Ruido de espectro fijo (rosa o marrón): sin modulación, es
+    // intencionalmente constante — para eso sirve este tipo de ruido.
+    const makeBuf = type === "rosa" ? createPinkNoiseBuffer : createBrownNoiseBuffer;
+    const layerA = ctx.createBufferSource();
+    layerA.buffer = makeBuf(ctx, 23); layerA.loop = true;
+    const layerB = ctx.createBufferSource();
+    layerB.buffer = makeBuf(ctx, 31); layerB.loop = true;
+    const gainA = ctx.createGain(); gainA.gain.value = 0.6;
+    const gainB = ctx.createGain(); gainB.gain.value = 0.4;
+    layerA.connect(gainA).connect(bgGain);
+    layerB.connect(gainB).connect(bgGain);
+    layerA.start(); layerB.start();
+    sources.push(layerA, layerB);
+
+    bgGain.connect(getDestination(ctx));
+    bgNodes = { sources, bgGain, extraOsc: [] };
     bgType = type;
     renderBgChips();
     return;
   }
 
-  filter.connect(bgGain); bgGain.connect(ctx.destination);
+  filter.connect(bgGain); bgGain.connect(getDestination(ctx));
 
   bgNodes = { sources, bgGain, filter, lfo, ampLfo };
   bgType = type;
@@ -443,7 +611,7 @@ function playTone(hz) {
   gain.gain.linearRampToValueAtTime(volume, now + 1.2);
   const oscA = ctx.createOscillator(); oscA.type = "sine"; oscA.frequency.value = hz;
   const oscB = ctx.createOscillator(); oscB.type = "sine"; oscB.frequency.value = hz; oscB.detune.value = 6;
-  oscA.connect(filter); oscB.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+  oscA.connect(filter); oscB.connect(filter); filter.connect(gain); gain.connect(getDestination(ctx));
   oscA.start(); oscB.start();
   nodes = { gain, oscA, oscB, filter };
   activeId = `solfeggio-${hz}`;
@@ -462,7 +630,7 @@ function playBinaural(item) {
   const oscB = ctx.createOscillator(); oscB.type = "sine"; oscB.frequency.value = item.base + item.beat / 2;
   const panA = ctx.createStereoPanner(); panA.pan.value = -1;
   const panB = ctx.createStereoPanner(); panB.pan.value = 1;
-  oscA.connect(panA).connect(gain); oscB.connect(panB).connect(gain); gain.connect(ctx.destination);
+  oscA.connect(panA).connect(gain); oscB.connect(panB).connect(gain); gain.connect(getDestination(ctx));
   oscA.start(); oscB.start();
   nodes = { gain, oscA, oscB };
   activeId = `brainwave-${item.id}`;
