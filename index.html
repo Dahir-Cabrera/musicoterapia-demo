@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Musicoterapia por Frecuencias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg1:#17202E; --bg2:#0D1219; --bg3:#0A0D13;
+    --gold:#4FA8D8; --text:#EDE7D9; --text2:#9AA3B5; --text3:#5C6478;
+    --border:rgba(255,255,255,0.08);
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin:0; height:100%;
+    background: radial-gradient(ellipse at 50% 0%, var(--bg1) 0%, var(--bg2) 65%, var(--bg3) 100%);
+    color: var(--text);
+    font-family:'Inter', sans-serif;
+  }
+  .wrap { padding: 28px 24px 40px; max-width: 980px; margin: 0 auto; }
+  .eyebrow { font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.14em; color:var(--gold); margin-bottom:4px; }
+  .title { font-family:'Fraunces', serif; font-size:26px; font-weight:600; color:#F2ECDD; margin-bottom:18px; }
+  .tabs { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .tab {
+    background: rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+    color: var(--text2); border-radius:8px; padding:9px 16px; font-size:13px;
+    cursor:pointer; font-family:'Inter', sans-serif;
+  }
+  .tab.active { background: rgba(79,168,216,0.12); border-color: var(--gold); color:#F2ECDD; }
+  .notice {
+    font-size:12.5px; color:#C7CEDB; background: rgba(255,255,255,0.04);
+    border:1px solid var(--border); border-radius:8px; padding:8px 12px; margin-bottom:14px; display:none;
+  }
+  .controls-bar {
+    display:flex; flex-wrap:wrap; gap:24px; align-items:center;
+    background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
+    border-radius:10px; padding:12px 16px; margin-bottom:22px;
+  }
+  .control-group { display:flex; flex-direction:column; gap:6px; }
+  .control-label { font-size:10.5px; letter-spacing:0.06em; color:var(--text2); text-transform:uppercase; }
+  input[type=range] { width:140px; accent-color: var(--gold); }
+  .timer-chip {
+    background: rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);
+    color: var(--text2); border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer;
+  }
+  .timer-chip.active { background: var(--gold); border-color: var(--gold); color:#0D1219; font-weight:600; }
+  .countdown { font-family:'JetBrains Mono', monospace; font-size:14px; color: var(--gold); margin-left:auto; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:14px; }
+  .card {
+    background: rgba(255,255,255,0.035); border:1px solid var(--border);
+    border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:8px;
+  }
+  .card.active { border-color: var(--gold); }
+  .card-top { display:flex; justify-content:space-between; align-items:center; }
+  .freq-tag {
+    font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:600; color: var(--gold);
+    background: rgba(79,168,216,0.1); padding:3px 9px; border-radius:6px; width:fit-content;
+  }
+  .pulse-wrap { position:relative; width:14px; height:14px; display:none; }
+  .pulse-wrap.on { display:block; }
+  .pulse-dot { position:absolute; inset:0; background: var(--gold); border-radius:999px; }
+  .pulse-ring { position:absolute; inset:0; border:1.5px solid var(--gold); border-radius:999px; animation: pulseRing 1.4s ease-out infinite; }
+  @keyframes pulseRing { 0% { transform: scale(0.92); opacity:0.7; } 100% { transform: scale(1.25); opacity:0; } }
+  .card-name { font-family:'Fraunces', serif; font-size:16.5px; color:#F2ECDD; }
+  .card-desc { font-size:12.5px; color: var(--text2); line-height:1.45; flex:1; }
+  .play-btn {
+    margin-top:4px; background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14);
+    color: var(--text); border-radius:8px; padding:9px 0; font-size:13px; font-weight:500; cursor:pointer;
+  }
+  .play-btn.active { background: var(--gold); border-color: var(--gold); color:#0D1219; font-weight:600; }
+  .footer {
+    margin-top:28px; font-size:10.5px; color: var(--text3); border-top:1px solid rgba(255,255,255,0.06);
+    padding-top:12px; line-height:1.5;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">SONOTERAPIA · BIENESTAR COMPLEMENTARIO</div>
+  <div class="title">Musicoterapia por Frecuencias</div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="solfeggio">Frecuencias Solfeggio</button>
+    <button class="tab" data-tab="brainwaves">Ondas Cerebrales (binaural)</button>
+  </div>
+
+  <div class="notice" id="notice">🎧 Usa audífonos — el efecto binaural requiere un tono distinto en cada oído.</div>
+
+  <div class="controls-bar">
+    <div class="control-group">
+      <span class="control-label">Volumen · <span id="volumePercent">45%</span></span>
+      <input type="range" id="volume" min="0" max="0.4" step="0.01" value="0.18" />
+    </div>
+    <div class="control-group">
+      <span class="control-label">Duración de sesión</span>
+      <div style="display:flex; gap:6px;" id="timerChips"></div>
+    </div>
+    <div class="countdown" id="countdown"></div>
+  </div>
+
+  <div class="controls-bar">
+    <div class="control-group">
+      <span class="control-label">Ambiente de fondo</span>
+      <div style="display:flex; gap:6px;" id="bgChips"></div>
+    </div>
+    <div class="control-group">
+      <span class="control-label">Volumen ambiente · <span id="bgVolumePercent">30%</span></span>
+      <input type="range" id="bgVolume" min="0" max="0.3" step="0.01" value="0.09" />
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="footer">
+    Estas asociaciones provienen de la tradición de sonoterapia y no cuentan con evidencia científica
+    concluyente de efecto curativo. Es contenido de bienestar complementario — no sustituye evaluación
+    ni tratamiento médico o psicológico profesional. Evita usar auriculares a volumen alto por periodos
+    prolongados.
+  </div>
+</div>
+
+<script>
+const SOLFEGGIO = [
+  { hz: 174, nombre: "Base y alivio", desc: "La más grave de la serie. En sonoterapia se usa como fondo relajante, asociada a dar sensación de seguridad y aliviar tensión física." },
+  { hz: 285, nombre: "Restauración", desc: "Asociada tradicionalmente con sensación de renovación y restauración de energía tras el cansancio." },
+  { hz: 396, nombre: "Soltar miedo y culpa", desc: "Primera de las 'seis frecuencias Solfeggio' históricas. Se asocia con liberar bloqueos emocionales y miedo." },
+  { hz: 417, nombre: "Facilitar el cambio", desc: "Asociada con deshacer patrones repetitivos y facilitar transiciones o cambios de situación." },
+  { hz: 528, nombre: "Frecuencia del 'amor'", desc: "La más popular de la serie, apodada 'frecuencia de la transformación'. Muy usada en meditación y relajación." },
+  { hz: 639, nombre: "Conexión y relaciones", desc: "Asociada con armonizar relaciones interpersonales y mejorar la comunicación emocional." },
+  { hz: 741, nombre: "Claridad y expresión", desc: "Vinculada tradicionalmente con despertar la intuición y facilitar la expresión personal." },
+  { hz: 852, nombre: "Orden interior", desc: "Asociada con el retorno a un estado de calma y orden espiritual/mental." },
+  { hz: 963, nombre: "Conciencia elevada", desc: "La más aguda de la serie clásica. Se asocia con estados de meditación profunda y presencia." },
+];
+const BRAINWAVES = [
+  { id: "delta", base: 100, beat: 2.5, nombre: "Delta — Sueño profundo", desc: "Ondas cerebrales asociadas con el sueño profundo y la recuperación física. Ideal para escuchar antes de dormir." },
+  { id: "theta", base: 100, beat: 6, nombre: "Theta — Meditación profunda", desc: "Asociadas con estados meditativos profundos, creatividad y relajación intensa." },
+  { id: "alpha", base: 110, beat: 10, nombre: "Alpha — Calma alerta", desc: "Asociadas con un estado de relajación consciente: tranquilo pero despierto. Buenas para desconectar sin dormirse." },
+  { id: "beta", base: 120, beat: 18, nombre: "Beta — Enfoque", desc: "Asociadas con concentración activa y estado de alerta. Usadas para sesiones de estudio o trabajo enfocado." },
+  { id: "gamma", base: 130, beat: 40, nombre: "Gamma — Procesamiento elevado", desc: "Frecuencia más alta del grupo, asociada con procesamiento cognitivo intenso y percepción aguda." },
+];
+const TIMER_OPTIONS = [5, 10, 15, 30];
+
+let tab = "solfeggio";
+let activeId = null;
+let volume = 0.18;
+let timerMin = 10;
+let remaining = null;
+let timerInterval = null;
+let audioCtx = null;
+let nodes = {};
+
+let bgType = null;
+let bgVolume = 0.09;
+let bgNodes = {};
+const BG_OPTIONS = [
+  { id: "lluvia", label: "🌧️ Lluvia" },
+  { id: "mar", label: "🌊 Mar" },
+  { id: "viento", label: "🍃 Viento" },
+];
+
+const grid = document.getElementById("grid");
+const noticeEl = document.getElementById("notice");
+const countdownEl = document.getElementById("countdown");
+const volumeInput = document.getElementById("volume");
+const timerChipsEl = document.getElementById("timerChips");
+
+function fmt(secs) {
+  if (secs == null) return "";
+  const m = Math.floor(secs / 60).toString().padStart(2, "0");
+  const s = Math.floor(secs % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+function ensureCtx() {
+  if (!audioCtx || audioCtx.state === "closed") {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+function createEnvelopeBuffer(ctx, seconds, smoothSeconds) {
+  // Genera una "caminata aleatoria" suavizada con promedio circular: al
+  // promediar con envoltura (wrap-around), el final del buffer conecta
+  // matemáticamente con el inicio, sin necesidad de fundido ni costura.
+  const length = Math.floor(ctx.sampleRate * seconds);
+  let data = new Float32Array(length);
+  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+  const win = Math.max(2, Math.floor(ctx.sampleRate * smoothSeconds));
+  for (let pass = 0; pass < 3; pass++) {
+    const out = new Float32Array(length);
+    let sum = 0;
+    for (let i = -win; i < win; i++) sum += data[((i % length) + length) % length];
+    for (let i = 0; i < length; i++) {
+      out[i] = sum / (win * 2);
+      const addI = (i + win) % length;
+      const remI = ((i - win) % length + length) % length;
+      sum += data[addI] - data[remI];
+    }
+    data = out;
+  }
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  buffer.getChannelData(0).set(data);
+  return buffer;
+}
+
+function createNoiseBuffer(ctx, seconds = 4) {
+  const length = Math.floor(ctx.sampleRate * seconds);
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+  const fadeLen = Math.floor(ctx.sampleRate * 0.15);
+  for (let i = 0; i < fadeLen; i++) {
+    const f = i / fadeLen;
+    data[i] *= f;
+    data[length - 1 - i] *= f;
+  }
+  return buffer;
+}
+
+function stopBackground() {
+  if (bgNodes.bgGain && audioCtx && audioCtx.state !== "closed") {
+    const now = audioCtx.currentTime;
+    try {
+      bgNodes.bgGain.gain.cancelScheduledValues(now);
+      bgNodes.bgGain.gain.setValueAtTime(bgNodes.bgGain.gain.value, now);
+      bgNodes.bgGain.gain.linearRampToValueAtTime(0.0001, now + 0.6);
+    } catch (e) {}
+    const toStop = [...(bgNodes.sources || []), bgNodes.lfo, bgNodes.ampLfo, ...(bgNodes.extraOsc || [])].filter(Boolean);
+    setTimeout(() => toStop.forEach((o) => { try { o.stop(); } catch (e) {} }), 650);
+  }
+  bgType = null;
+  bgNodes = {};
+  renderBgChips();
+}
+
+function startBackground(type) {
+  stopBackground();
+  const ctx = ensureCtx();
+  const now = ctx.currentTime;
+
+  const bgGain = ctx.createGain();
+  bgGain.gain.setValueAtTime(0.0001, now);
+  bgGain.gain.linearRampToValueAtTime(bgVolume, now + 1.5);
+
+  const filter = ctx.createBiquadFilter();
+  let lfo = null, ampLfo = null;
+  const sources = [];
+
+  if (type === "lluvia") {
+    // Banda más angosta (menos "tupido" que un highpass abierto) y ciclos
+    // de 29s/41s: no vuelven a coincidir hasta ~20 minutos.
+    filter.type = "bandpass"; filter.frequency.value = 2400; filter.Q.value = 0.5;
+    const layerA = ctx.createBufferSource();
+    layerA.buffer = createNoiseBuffer(ctx, 29); layerA.loop = true;
+    const layerB = ctx.createBufferSource();
+    layerB.buffer = createNoiseBuffer(ctx, 41); layerB.loop = true;
+    const gainA = ctx.createGain(); gainA.gain.value = 0.6;
+    const gainB = ctx.createGain(); gainB.gain.value = 0.4;
+    layerA.connect(gainA).connect(filter);
+    layerB.connect(gainB).connect(filter);
+    layerA.start(); layerB.start();
+    sources.push(layerA, layerB);
+
+    // Variación de densidad orgánica (envolventes de ruido, no senos
+    // periódicos) — los senos sumados sonaban a ritmo de locomotora.
+    const texture = ctx.createGain(); texture.gain.value = 0.8;
+    const dropEnvA = ctx.createBufferSource();
+    dropEnvA.buffer = createEnvelopeBuffer(ctx, 9, 0.35); dropEnvA.loop = true;
+    const dropEnvB = ctx.createBufferSource();
+    dropEnvB.buffer = createEnvelopeBuffer(ctx, 14, 0.5); dropEnvB.loop = true;
+    const dropDepthA = ctx.createGain(); dropDepthA.gain.value = 0.1;
+    const dropDepthB = ctx.createGain(); dropDepthB.gain.value = 0.08;
+    dropEnvA.connect(dropDepthA).connect(texture.gain);
+    dropEnvB.connect(dropDepthB).connect(texture.gain);
+    dropEnvA.start(); dropEnvB.start();
+    sources.push(dropEnvA, dropEnvB);
+    filter.connect(texture); texture.connect(bgGain);
+    bgGain.connect(ctx.destination);
+    bgNodes = { sources, bgGain, filter, extraOsc: [] };
+    bgType = type;
+    renderBgChips();
+    return;
+  } else if (type === "mar") {
+    filter.type = "lowpass"; filter.frequency.value = 600; filter.Q.value = 0.5;
+    const layerA = ctx.createBufferSource();
+    layerA.buffer = createNoiseBuffer(ctx, 19); layerA.loop = true;
+    const layerB = ctx.createBufferSource();
+    layerB.buffer = createNoiseBuffer(ctx, 26); layerB.loop = true;
+    const gainA = ctx.createGain(); gainA.gain.value = 0.65;
+    const gainB = ctx.createGain(); gainB.gain.value = 0.45;
+    layerA.connect(gainA).connect(filter);
+    layerB.connect(gainB).connect(filter);
+    layerA.start(); layerB.start();
+    sources.push(layerA, layerB);
+    lfo = ctx.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 0.045;
+    const lfoGain = ctx.createGain(); lfoGain.gain.value = 300;
+    lfo.connect(lfoGain).connect(filter.frequency); lfo.start();
+    ampLfo = ctx.createOscillator(); ampLfo.type = "sine"; ampLfo.frequency.value = 0.045;
+    const ampLfoGain = ctx.createGain(); ampLfoGain.gain.value = bgVolume * 0.4;
+    ampLfo.connect(ampLfoGain).connect(bgGain.gain); ampLfo.start();
+  } else if (type === "viento") {
+    // Capa de "ráfaga" (grave, barre lentamente) + capa de "hojas" (aguda,
+    // con flutter rápido) para una textura de viento entre árboles.
+    filter.type = "bandpass"; filter.frequency.value = 700; filter.Q.value = 0.6;
+    const layerA = ctx.createBufferSource();
+    layerA.buffer = createNoiseBuffer(ctx, 12); layerA.loop = true;
+    const layerB = ctx.createBufferSource();
+    layerB.buffer = createNoiseBuffer(ctx, 17); layerB.loop = true;
+    const gainA = ctx.createGain(); gainA.gain.value = 0.6;
+    const gainB = ctx.createGain(); gainB.gain.value = 0.4;
+    layerA.connect(gainA).connect(filter);
+    layerB.connect(gainB).connect(filter);
+    layerA.start(); layerB.start();
+    sources.push(layerA, layerB);
+    // Dos envolventes a distinta velocidad, sumadas: una lenta (vaivén
+    // general) y otra más rápida (ráfagas individuales encima), en vez de
+    // una sola "ola" que se siente como rampa constante.
+    const gustModSlow = ctx.createBufferSource();
+    gustModSlow.buffer = createEnvelopeBuffer(ctx, 31, 1.6); gustModSlow.loop = true;
+    const gustModFast = ctx.createBufferSource();
+    gustModFast.buffer = createEnvelopeBuffer(ctx, 15, 0.5); gustModFast.loop = true;
+    const gustModSlowDepth = ctx.createGain(); gustModSlowDepth.gain.value = 260;
+    const gustModFastDepth = ctx.createGain(); gustModFastDepth.gain.value = 170;
+    gustModSlow.connect(gustModSlowDepth).connect(filter.frequency);
+    gustModFast.connect(gustModFastDepth).connect(filter.frequency);
+    gustModSlow.start(); gustModFast.start();
+    sources.push(gustModSlow, gustModFast);
+    const gustLevel = ctx.createGain(); gustLevel.gain.value = 1.35;
+    filter.connect(gustLevel).connect(bgGain);
+
+    // Capa de hojas: banda más texturizada (no highpass abierto = hiss liso)
+    const leavesFilter = ctx.createBiquadFilter();
+    leavesFilter.type = "bandpass"; leavesFilter.frequency.value = 1900; leavesFilter.Q.value = 2.2;
+    const leafA = ctx.createBufferSource();
+    leafA.buffer = createNoiseBuffer(ctx, 14); leafA.loop = true;
+    const leafB = ctx.createBufferSource();
+    leafB.buffer = createNoiseBuffer(ctx, 19); leafB.loop = true;
+    const leafGainA = ctx.createGain(); leafGainA.gain.value = 0.6;
+    const leafGainB = ctx.createGain(); leafGainB.gain.value = 0.4;
+    leafA.connect(leafGainA).connect(leavesFilter);
+    leafB.connect(leafGainB).connect(leavesFilter);
+    leafA.start(); leafB.start();
+    sources.push(leafA, leafB);
+
+    // Modulación orgánica: envolventes de bucle continuo (no un LFO senoidal
+    // periódico) para que el vaivén de intensidad sea irregular, como
+    // rachas reales de viento entre el follaje. Doble velocidad, igual
+    // que en la ráfaga.
+    const leavesLevel = ctx.createGain(); leavesLevel.gain.value = 0.2; // volumen relativo a la ráfaga
+    const modEnvSlow = ctx.createBufferSource();
+    modEnvSlow.buffer = createEnvelopeBuffer(ctx, 23, 1.1); modEnvSlow.loop = true;
+    const modEnvFast = ctx.createBufferSource();
+    modEnvFast.buffer = createEnvelopeBuffer(ctx, 13, 0.4); modEnvFast.loop = true;
+    const modDepthSlow = ctx.createGain(); modDepthSlow.gain.value = 0.1;
+    const modDepthFast = ctx.createGain(); modDepthFast.gain.value = 0.07;
+    modEnvSlow.connect(modDepthSlow).connect(leavesLevel.gain);
+    modEnvFast.connect(modDepthFast).connect(leavesLevel.gain);
+    modEnvSlow.start(); modEnvFast.start();
+    sources.push(modEnvSlow, modEnvFast);
+
+    leavesFilter.connect(leavesLevel).connect(bgGain);
+    bgGain.connect(ctx.destination);
+    bgNodes = { sources, bgGain, filter, lfo, extraOsc: [] };
+    bgType = type;
+    renderBgChips();
+    return;
+  }
+
+  filter.connect(bgGain); bgGain.connect(ctx.destination);
+
+  bgNodes = { sources, bgGain, filter, lfo, ampLfo };
+  bgType = type;
+  renderBgChips();
+}
+
+function renderBgChips() {
+  const wrap = document.getElementById("bgChips");
+  wrap.innerHTML = "";
+  const noneBtn = document.createElement("button");
+  noneBtn.className = "timer-chip" + (bgType === null ? " active" : "");
+  noneBtn.textContent = "Ninguno";
+  noneBtn.onclick = () => stopBackground();
+  wrap.appendChild(noneBtn);
+  BG_OPTIONS.forEach((opt) => {
+    const btn = document.createElement("button");
+    btn.className = "timer-chip" + (bgType === opt.id ? " active" : "");
+    btn.textContent = opt.label;
+    btn.onclick = () => startBackground(opt.id);
+    wrap.appendChild(btn);
+  });
+}
+
+function stopAudio() {
+  clearInterval(timerInterval);
+  if (nodes.gain && audioCtx && audioCtx.state !== "closed") {
+    const now = audioCtx.currentTime;
+    try {
+      nodes.gain.gain.cancelScheduledValues(now);
+      nodes.gain.gain.setValueAtTime(nodes.gain.gain.value, now);
+      nodes.gain.gain.linearRampToValueAtTime(0.0001, now + 0.5);
+    } catch (e) {}
+    const toStop = [nodes.oscA, nodes.oscB].filter(Boolean);
+    setTimeout(() => toStop.forEach((o) => { try { o.stop(); } catch (e) {} }), 550);
+  }
+  remaining = null;
+  activeId = null;
+  nodes = {};
+  updateCountdown();
+  renderGrid();
+}
+
+function startTimer() {
+  clearInterval(timerInterval);
+  let secs = timerMin * 60;
+  remaining = secs;
+  updateCountdown();
+  timerInterval = setInterval(() => {
+    secs -= 1;
+    remaining = secs;
+    updateCountdown();
+    if (secs <= 0) stopAudio();
+  }, 1000);
+}
+
+function updateCountdown() {
+  countdownEl.textContent = remaining != null ? `${fmt(remaining)} restantes` : "";
+}
+
+function playTone(hz) {
+  stopAudio();
+  const ctx = ensureCtx();
+  const now = ctx.currentTime;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass"; filter.frequency.value = 2400;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.linearRampToValueAtTime(volume, now + 1.2);
+  const oscA = ctx.createOscillator(); oscA.type = "sine"; oscA.frequency.value = hz;
+  const oscB = ctx.createOscillator(); oscB.type = "sine"; oscB.frequency.value = hz; oscB.detune.value = 6;
+  oscA.connect(filter); oscB.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+  oscA.start(); oscB.start();
+  nodes = { gain, oscA, oscB, filter };
+  activeId = `solfeggio-${hz}`;
+  startTimer();
+  renderGrid();
+}
+
+function playBinaural(item) {
+  stopAudio();
+  const ctx = ensureCtx();
+  const now = ctx.currentTime;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.linearRampToValueAtTime(volume, now + 1.2);
+  const oscA = ctx.createOscillator(); oscA.type = "sine"; oscA.frequency.value = item.base - item.beat / 2;
+  const oscB = ctx.createOscillator(); oscB.type = "sine"; oscB.frequency.value = item.base + item.beat / 2;
+  const panA = ctx.createStereoPanner(); panA.pan.value = -1;
+  const panB = ctx.createStereoPanner(); panB.pan.value = 1;
+  oscA.connect(panA).connect(gain); oscB.connect(panB).connect(gain); gain.connect(ctx.destination);
+  oscA.start(); oscB.start();
+  nodes = { gain, oscA, oscB };
+  activeId = `brainwave-${item.id}`;
+  startTimer();
+  renderGrid();
+}
+
+function renderTabs() {
+  document.querySelectorAll(".tab").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.tab === tab);
+  });
+  noticeEl.style.display = tab === "brainwaves" ? "block" : "none";
+}
+
+function renderTimerChips() {
+  timerChipsEl.innerHTML = "";
+  TIMER_OPTIONS.forEach((m) => {
+    const btn = document.createElement("button");
+    btn.className = "timer-chip" + (timerMin === m ? " active" : "");
+    btn.textContent = `${m}m`;
+    btn.onclick = () => { timerMin = m; renderTimerChips(); };
+    timerChipsEl.appendChild(btn);
+  });
+}
+
+function renderGrid() {
+  const list = tab === "solfeggio" ? SOLFEGGIO : BRAINWAVES;
+  grid.innerHTML = "";
+  list.forEach((item) => {
+    const id = tab === "solfeggio" ? `solfeggio-${item.hz}` : `brainwave-${item.id}`;
+    const isActive = activeId === id;
+    const card = document.createElement("div");
+    card.className = "card" + (isActive ? " active" : "");
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="freq-tag">${tab === "solfeggio" ? item.hz + " Hz" : item.beat + " Hz"}</div>
+        <div class="pulse-wrap ${isActive ? "on" : ""}"><span class="pulse-dot"></span><span class="pulse-ring"></span></div>
+      </div>
+      <div class="card-name">${item.nombre}</div>
+      <div class="card-desc">${item.desc}</div>
+      <button class="play-btn ${isActive ? "active" : ""}">${isActive ? "Detener" : "Reproducir"}</button>
+    `;
+    card.querySelector(".play-btn").onclick = () => {
+      if (isActive) { stopAudio(); }
+      else if (tab === "solfeggio") { playTone(item.hz); }
+      else { playBinaural(item); }
+    };
+    grid.appendChild(card);
+  });
+}
+
+document.querySelectorAll(".tab").forEach((btn) => {
+  btn.onclick = () => { tab = btn.dataset.tab; renderTabs(); renderGrid(); };
+});
+volumeInput.oninput = (e) => {
+  volume = parseFloat(e.target.value);
+  document.getElementById("volumePercent").textContent = Math.round((volume / 0.4) * 100) + "%";
+  if (nodes.gain && audioCtx) nodes.gain.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.15);
+};
+
+const bgVolumeInput = document.getElementById("bgVolume");
+bgVolumeInput.oninput = (e) => {
+  bgVolume = parseFloat(e.target.value);
+  document.getElementById("bgVolumePercent").textContent = Math.round((bgVolume / 0.3) * 100) + "%";
+  if (bgNodes.bgGain && audioCtx) bgNodes.bgGain.gain.setTargetAtTime(bgVolume, audioCtx.currentTime, 0.15);
+};
+
+renderTabs();
+renderTimerChips();
+renderBgChips();
+renderGrid();
+</script>
+</body>
+</html>
