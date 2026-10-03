@@ -78,10 +78,56 @@
     margin-top:28px; font-size:10.5px; color: var(--text3); border-top:1px solid rgba(255,255,255,0.06);
     padding-top:12px; line-height:1.5;
   }
+  .gate-wrap {
+    width:100%; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    padding:24px; box-sizing:border-box;
+  }
+  .gate-card {
+    width:100%; max-width:380px; background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1);
+    border-radius:16px; padding:32px 28px; box-shadow:0 20px 50px rgba(0,0,0,0.4);
+  }
+  .gate-eyebrow { font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.12em; color:var(--gold); margin-bottom:8px; }
+  .gate-title { font-family:'Fraunces', serif; font-size:24px; font-weight:600; color:#F2ECDD; margin-bottom:8px; }
+  .gate-subtitle { font-size:13.5px; color:var(--text2); line-height:1.5; margin-bottom:20px; }
+  .gate-form { display:flex; flex-direction:column; gap:10px; }
+  .gate-input {
+    background: rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.14); border-radius:8px;
+    padding:11px 13px; color:#EDE7D9; font-size:14px; outline:none; font-family:'Inter', sans-serif;
+  }
+  .gate-button {
+    margin-top:4px; background: var(--gold); border:none; border-radius:8px; padding:12px 0;
+    font-size:14px; font-weight:600; color:#0D1219; cursor:pointer;
+  }
+  .gate-button:disabled { opacity:0.6; cursor:default; }
+  .gate-error { font-size:12.5px; color:#D98C8C; margin-top:10px; }
+  .gate-fine { font-size:10.5px; color:var(--text3); margin-top:16px; text-align:center; }
 </style>
 </head>
 <body>
-<div class="wrap">
+
+<div class="gate-wrap" id="gateWrap">
+  <div class="gate-card">
+    <div class="gate-eyebrow">ACCESO GRATUITO POR TIEMPO LIMITADO</div>
+    <div class="gate-title">Musicoterapia por Frecuencias</div>
+    <p class="gate-subtitle">Déjanos tu correo para entrar hoy sin costo. Te avisaremos ahí cuando actives tu suscripción.</p>
+    <form class="gate-form" id="gateForm">
+      <input type="text" id="gateNombre" class="gate-input" placeholder="Tu nombre (opcional)" />
+      <input type="email" id="gateEmail" class="gate-input" placeholder="tu@correo.com" required />
+      <input type="tel" id="gateTelefono" class="gate-input" placeholder="WhatsApp / teléfono (opcional)" />
+      <select id="gateInteres" class="gate-input">
+        <option value="">¿Te interesaría también consultar puntos de acupuntura? (opcional)</option>
+        <option value="si">Sí, también me interesa acupuntura</option>
+        <option value="no">No, solo musicoterapia</option>
+      </select>
+      <input type="text" id="gateOrigen" class="gate-input" placeholder="¿Cómo te enteraste de esto? (opcional)" />
+      <button type="submit" class="gate-button" id="gateSubmit">Entrar</button>
+    </form>
+    <div class="gate-error" id="gateError" style="display:none;"></div>
+    <div class="gate-fine">No compartimos tu correo con terceros.</div>
+  </div>
+</div>
+
+<div class="wrap" id="appWrap" style="display:none;">
   <div class="eyebrow">SONOTERAPIA · BIENESTAR COMPLEMENTARIO</div>
   <div class="title">Musicoterapia por Frecuencias</div>
 
@@ -126,6 +172,66 @@
 </div>
 
 <script>
+// ============================================================
+// PUERTA DE ACCESO (lanzamiento gratuito de prueba)
+// Reemplaza FORMSPREE_ENDPOINT con el endpoint real que te da
+// Formspree (https://formspree.io/f/xxxxxxxx) al crear tu formulario.
+// ============================================================
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/mnpnelol";
+const GATE_STORAGE_KEY = "acceso_registrado_musicoterapia";
+
+const gateWrap = document.getElementById("gateWrap");
+const appWrap = document.getElementById("appWrap");
+const gateForm = document.getElementById("gateForm");
+const gateSubmit = document.getElementById("gateSubmit");
+const gateError = document.getElementById("gateError");
+
+function unlockApp() {
+  gateWrap.style.display = "none";
+  appWrap.style.display = "block";
+}
+
+if (localStorage.getItem(GATE_STORAGE_KEY) === "true") {
+  unlockApp();
+}
+
+gateForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("gateEmail").value.trim();
+  const nombre = document.getElementById("gateNombre").value.trim();
+  const telefono = document.getElementById("gateTelefono").value.trim();
+  const interesAcupuntura = document.getElementById("gateInteres").value;
+  const comoSeEntero = document.getElementById("gateOrigen").value.trim();
+  if (!email) return;
+
+  gateSubmit.disabled = true;
+  gateSubmit.textContent = "Entrando…";
+  gateError.style.display = "none";
+
+  try {
+    const res = await fetch(FORMSPREE_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        email,
+        nombre,
+        telefono,
+        interes_acupuntura: interesAcupuntura,
+        como_se_entero: comoSeEntero,
+        origen: "musicoterapia",
+      }),
+    });
+    if (!res.ok) throw new Error("Formspree respondió con error");
+    localStorage.setItem(GATE_STORAGE_KEY, "true");
+    unlockApp();
+  } catch (err) {
+    gateError.textContent = "No pudimos guardar tu registro. Intenta de nuevo en unos segundos.";
+    gateError.style.display = "block";
+    gateSubmit.disabled = false;
+    gateSubmit.textContent = "Entrar";
+  }
+});
+
 const SOLFEGGIO = [
   { hz: 174, nombre: "Base y alivio", desc: "La más grave de la serie. En sonoterapia se usa como fondo relajante, asociada a dar sensación de seguridad y aliviar tensión física." },
   { hz: 285, nombre: "Restauración", desc: "Asociada tradicionalmente con sensación de renovación y restauración de energía tras el cansancio." },
