@@ -159,13 +159,29 @@ let bgType = null;
 let bgVolume = 0.09;
 let bgNodes = {};
 const BG_OPTIONS = [
-  { id: "lluvia", label: "🌧️ Lluvia" },
-  { id: "mar", label: "🌊 Mar" },
-  { id: "viento", label: "🍃 Viento" },
-  { id: "fuego", label: "🔥 Fuego" },
   { id: "rosa", label: "🌸 Ruido rosa" },
   { id: "marron", label: "🟤 Ruido marrón" },
+  { id: "cascada", label: "🏞️ Cascada en la selva" },
+  { id: "cenote", label: "💧 Cenote" },
+  { id: "lluvia_verano", label: "🌧️ Lluvia de verano en selva tropical" },
+  { id: "ranas_grillos", label: "🐸 Ranas y grillos" },
+  { id: "arroyo", label: "🏕️ Arroyo" },
+  { id: "aguacero", label: "🌧️ Aguacero en la selva" },
 ];
+
+// Grabaciones reales del usuario, publicadas junto con este artefacto
+// (carpeta sounds/). Si alguna URL falla al cargar, ese paisaje
+// simplemente no sonará — no hay versión sintetizada de respaldo
+// para estos, son grabaciones reales.
+const AMBIENT_AUDIO_URL = {
+  cascada: "sounds/cascada.mp3",
+  cenote: "sounds/cenote.mp3",
+  lluvia_verano: "sounds/lluvia_verano.mp3",
+  ranas_grillos: "sounds/ranas_grillos.mp3",
+  arroyo: "sounds/arroyo.mp3",
+  aguacero: "sounds/aguacero.mp3",
+};
+const realAudioBufferCache = {};
 
 const grid = document.getElementById("grid");
 const noticeEl = document.getElementById("notice");
@@ -367,7 +383,39 @@ function startBackground(type) {
   let lfo = null, ampLfo = null;
   const sources = [];
 
-  if (type === "lluvia") {
+  if (AMBIENT_AUDIO_URL[type]) {
+    // Grabación real: se reproduce en bucle a través del mismo bus
+    // (bgGain → getDestination), así que comparte el fix de audio en
+    // segundo plano con todo lo demás.
+    bgGain.connect(getDestination(ctx));
+    bgNodes = { sources: [], bgGain };
+    bgType = type;
+    renderBgChips();
+
+    const loadAndPlay = (buffer) => {
+      if (bgType !== type) return; // el usuario ya cambió de paisaje
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      source.connect(bgGain);
+      source.start();
+      bgNodes.sources = [source];
+    };
+
+    if (realAudioBufferCache[type]) {
+      loadAndPlay(realAudioBufferCache[type]);
+    } else {
+      fetch(AMBIENT_AUDIO_URL[type])
+        .then((res) => res.arrayBuffer())
+        .then((arr) => ctx.decodeAudioData(arr))
+        .then((buffer) => {
+          realAudioBufferCache[type] = buffer;
+          loadAndPlay(buffer);
+        })
+        .catch((e) => console.warn(`No se pudo cargar el audio real de "${type}":`, e));
+    }
+    return;
+  } else if (type === "lluvia") {
     // Banda más angosta (menos "tupido" que un highpass abierto) y ciclos
     // de 29s/41s: no vuelven a coincidir hasta ~20 minutos.
     filter.type = "bandpass"; filter.frequency.value = 2400; filter.Q.value = 0.5;
