@@ -287,6 +287,17 @@ const AMBIENT_AUDIO_URL = {
   arroyo: "sounds/arroyo.mp3",
   aguacero: "sounds/aguacero.mp3",
 };
+// Refuerzo de volumen por grabación — algunas llegaron más bajas que
+// otras, así que cada una puede ajustarse por separado en vez de usar
+// un solo valor parejo para las 6.
+const AMBIENT_BOOST = {
+  cascada: 3.2,
+  cenote: 3.2,
+  lluvia_verano: 5.5,
+  ranas_grillos: 3.2,
+  arroyo: 3.2,
+  aguacero: 3.2,
+};
 const realAudioBufferCache = {};
 
 const grid = document.getElementById("grid");
@@ -521,7 +532,7 @@ function startBackground(type) {
       // sintetizado (rosa/marrón), así que se refuerzan con ganancia extra.
       // El compresor evita que los picos fuertes (ej. un croar) se recorten.
       const boost = ctx.createGain();
-      boost.gain.value = 3.2;
+      boost.gain.value = AMBIENT_BOOST[type] || 3.2;
       const compressor = ctx.createDynamicsCompressor();
       compressor.threshold.value = -12;
       compressor.knee.value = 18;
