@@ -503,7 +503,18 @@ function startBackground(type) {
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.loop = true;
-      source.connect(bgGain);
+      // Las grabaciones reales llegan mucho más bajas que el ruido
+      // sintetizado (rosa/marrón), así que se refuerzan con ganancia extra.
+      // El compresor evita que los picos fuertes (ej. un croar) se recorten.
+      const boost = ctx.createGain();
+      boost.gain.value = 3.2;
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.value = -12;
+      compressor.knee.value = 18;
+      compressor.ratio.value = 4;
+      compressor.attack.value = 0.01;
+      compressor.release.value = 0.25;
+      source.connect(boost).connect(compressor).connect(bgGain);
       source.start();
       bgNodes.sources = [source];
     };
