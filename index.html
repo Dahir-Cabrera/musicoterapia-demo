@@ -486,6 +486,10 @@ function scheduleFireCrackles(ctx, bgGain) {
 
 function stopBackground() {
   if (bgNodes.crackleHolder) clearTimeout(bgNodes.crackleHolder.timeoutId);
+  if (bgNodes.loopState) {
+    bgNodes.loopState.stopped = true;
+    clearTimeout(bgNodes.loopState.timeoutId);
+  }
   if (bgNodes.bgGain && audioCtx && audioCtx.state !== "closed") {
     const now = audioCtx.currentTime;
     try {
@@ -519,29 +523,57 @@ function startBackground(type) {
     // (bgGain → getDestination), así que comparte el fix de audio en
     // segundo plano con todo lo demás.
     bgGain.connect(getDestination(ctx));
-    bgNodes = { sources: [], bgGain };
+    const activeSources = [];
+    const loopState = { timeoutId: null, stopped: false };
+    bgNodes = { sources: activeSources, bgGain, loopState };
+    const nodesRef = bgNodes; // referencia fija para los closures async de abajo
     bgType = type;
     renderBgChips();
 
-    const loadAndPlay = (buffer) => {
-      if (bgType !== type) return; // el usuario ya cambió de paisaje
+    // Las grabaciones reales llegan mucho más bajas que el ruido
+    // sintetizado (rosa/marrón), así que se refuerzan con ganancia extra.
+    // El compresor evita que los picos fuertes (ej. un croar) se recorten.
+    const boost = ctx.createGain();
+    boost.gain.value = AMBIENT_BOOST[type] || 3.2;
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -12;
+    compressor.knee.value = 18;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.01;
+    compressor.release.value = 0.25;
+    boost.connect(compressor).connect(bgGain);
+
+    // El final de una grabación real no conecta de forma natural con su
+    // propio inicio (a diferencia del ruido sintetizado, hecho para
+    // enlazar matemáticamente). En vez de .loop=true (que produce un
+    // corte seco y audible en cada repetición), se programan copias
+    // superpuestas del mismo buffer con un crossfade: mientras una copia
+    // se desvanece, la siguiente ya empezó a sonar, así el reinicio
+    // queda disimulado dentro de la mezcla en vez de sonar como un clic.
+    function scheduleLoop(buffer, startTime) {
+      if (loopState.stopped || bgNodes !== nodesRef) return;
+      const duration = buffer.duration;
+      const fade = Math.min(1.5, duration / 4);
       const source = ctx.createBufferSource();
       source.buffer = buffer;
-      source.loop = true;
-      // Las grabaciones reales llegan mucho más bajas que el ruido
-      // sintetizado (rosa/marrón), así que se refuerzan con ganancia extra.
-      // El compresor evita que los picos fuertes (ej. un croar) se recorten.
-      const boost = ctx.createGain();
-      boost.gain.value = AMBIENT_BOOST[type] || 3.2;
-      const compressor = ctx.createDynamicsCompressor();
-      compressor.threshold.value = -12;
-      compressor.knee.value = 18;
-      compressor.ratio.value = 4;
-      compressor.attack.value = 0.01;
-      compressor.release.value = 0.25;
-      source.connect(boost).connect(compressor).connect(bgGain);
-      source.start();
-      bgNodes.sources = [source];
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, startTime);
+      g.gain.linearRampToValueAtTime(1, startTime + fade);
+      g.gain.setValueAtTime(1, startTime + duration - fade);
+      g.gain.linearRampToValueAtTime(0, startTime + duration);
+      source.connect(g).connect(boost);
+      source.start(startTime);
+      source.stop(startTime + duration + 0.05);
+      activeSources.push(source);
+      const delayMs = Math.max(0, (startTime + duration - fade - ctx.currentTime) * 1000);
+      loopState.timeoutId = setTimeout(() => {
+        scheduleLoop(buffer, startTime + duration - fade);
+      }, delayMs);
+    }
+
+    const loadAndPlay = (buffer) => {
+      if (bgType !== type || bgNodes !== nodesRef) return; // el usuario ya cambió de paisaje
+      scheduleLoop(buffer, ctx.currentTime + 0.05);
     };
 
     if (realAudioBufferCache[type]) {
