@@ -225,10 +225,13 @@ gateForm.addEventListener("submit", async (e) => {
     localStorage.setItem(GATE_STORAGE_KEY, "true");
     unlockApp();
   } catch (err) {
-    gateError.textContent = "No pudimos guardar tu registro. Intenta de nuevo en unos segundos.";
-    gateError.style.display = "block";
-    gateSubmit.disabled = false;
-    gateSubmit.textContent = "Entrar";
+    // No se pudo guardar el registro (ej. se llegó al límite de envíos
+    // del plan gratuito de Formspree). Para no bloquear a la persona por
+    // un problema técnico de nuestro lado, se le deja entrar de todas
+    // formas — simplemente ese contacto en particular no queda registrado.
+    console.warn("No se pudo registrar el lead, se deja pasar de todas formas:", err);
+    localStorage.setItem(GATE_STORAGE_KEY, "true");
+    unlockApp();
   }
 });
 
