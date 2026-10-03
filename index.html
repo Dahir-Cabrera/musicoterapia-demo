@@ -323,6 +323,20 @@ function getDestination(ctx) {
   return mediaDestNode;
 }
 
+// Cuando se abre otra app que usa audio (ej. Voice Memos) y se regresa,
+// iOS interrumpe la sesión de audio de la pestaña. Los osciladores de
+// frecuencias/ondas se recrean desde cero cada vez que se les da play y
+// no les afecta, pero los buffers de las grabaciones reales que ya
+// estaban decodificados en caché pueden quedar mudos. Al volver a la
+// pestaña, se reintenta reactivar el audio y se limpia esa caché para
+// forzar una nueva decodificación en el siguiente play.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+  if (mediaAudioEl) mediaAudioEl.play().catch(() => {});
+  for (const k in realAudioBufferCache) delete realAudioBufferCache[k];
+});
+
 function ensureCtx() {
   if (!audioCtx || audioCtx.state === "closed") {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
